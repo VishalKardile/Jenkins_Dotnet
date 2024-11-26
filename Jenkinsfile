@@ -8,18 +8,24 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                // Checkout the code from the repository
                 checkout scm
+            }
+        }
+
+        stage('Restore') {
+            steps {
+                script {
+                    // Restore the dependencies for the project
+                    bat "dotnet restore"
+                }
             }
         }
 
         stage('Build') {
             steps {
                 script {
-                    // Restoring dependencies
-                    //bat "cd ${DOTNET_CLI_HOME} && dotnet restore"
-                    bat "dotnet restore"
-
-                    // Building the application
+                    // Build the application in Release configuration
                     bat "dotnet build --configuration Release"
                 }
             }
@@ -28,7 +34,7 @@ pipeline {
         stage('Test') {
             steps {
                 script {
-                    // Running tests
+                    // Run the tests (no restore, just using the existing dependencies)
                     bat "dotnet test --no-restore --configuration Release"
                 }
             }
@@ -37,29 +43,8 @@ pipeline {
         stage('Publish') {
             steps {
                 script {
-                    // Publishing the application
+                    // Publish the application (output to the publish folder)
                     bat "dotnet publish --no-restore --configuration Release --output .\\publish"
-                }
-            }
-        }
-        stage('Deploy') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'coreuser', passwordVariable: 'CREDENTIAL_PASSWORD', usernameVariable: 'CREDENTIAL_USERNAME')]) {
-                    powershell '''
-                    
-                    $credentials = New-Object System.Management.Automation.PSCredential($env:CREDENTIAL_USERNAME, (ConvertTo-SecureString $env:CREDENTIAL_PASSWORD -AsPlainText -Force))
-
-                    
-                    New-PSDrive -Name X -PSProvider FileSystem -Root "\\\\LAPTOP-DFRQ3ILG\\coreapp" -Persist -Credential $credentials
-
-                    
-                    Copy-Item -Path '.\\publish\\*' -Destination 'X:\' -Force
-
-                    
-                    Remove-PSDrive -Name X
-                    '''
-                }
                 }
             }
         }
@@ -67,7 +52,12 @@ pipeline {
 
     post {
         success {
+            // Notify or log success message
             echo 'Build, test, and publish successful!'
+        }
+        failure {
+            // Notify or log failure message
+            echo 'Build, test, or publish failed!'
         }
     }
 }
